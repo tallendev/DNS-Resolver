@@ -17,10 +17,12 @@ public class Util
     public static final int BYTE_LEN = 8;
     /** The length of a short, in bits. */
     public static final int SHORT_LEN = 16;
-    /** The maximum value of a byte. */
-    public static final byte MAX_BYTE = 127;
     /** The number of seconds in a minute. */
     public static final int SEC_IN_MIN = 60;
+    /** Number of minutes in hours. */
+    public static final int MIN_IN_HOUR = 60;
+    /** Number of hours in day*/
+    public static final int HOURS_IN_DAY = 24;
 
     /**
      * This method takes all of the bytes in a byte array, and adds them to a
@@ -74,8 +76,8 @@ public class Util
      */
     public static int bytesToInt(byte byte1, byte byte2, byte byte3, byte byte4)
     {
-        return ((int)bytesToShort(byte1, byte2) << SHORT_LEN) |
-               (int)bytesToShort(byte3, byte4);
+        return (bytesToShort(byte1, byte2) << SHORT_LEN) |
+               bytesToShort(byte3, byte4);
     }
 
     /**
@@ -153,8 +155,18 @@ public class Util
      */
     public static short unsignByteToShort(byte in)
     {
-        return in < 0 ? (short) (MAX_BYTE + (MAX_BYTE + 2 - Math.abs(in))) :
-                                (short) in;
+        return (short) (in & 0xFF);
+    }
+
+    /**
+     * This method "unsigns" a short. Due to Java not supporting unsigned
+     * shorts, we use ints instead.
+     * @param input The byte to unsign.
+     * @return The unsigned short.
+     */
+    public static int unsignShortToInt(short input)
+    {
+        return input & 0xFFFF;
     }
 
     /**
@@ -166,11 +178,21 @@ public class Util
      */
     public static String readableTime(int seconds)
     {
-        int min = seconds / SEC_IN_MIN;
-        int sec = seconds % SEC_IN_MIN;
-        String strMin = " Minute" + ((min != 1) ? "s" : "");
-        String strSec = " Second" + ((sec != 1) ? "s" : "");
-        return min + strMin + ", " + sec + strSec;
+        long full_sec = unsignShortToInt((short) seconds);
+        long min = full_sec /  SEC_IN_MIN;
+        long sec = full_sec %  SEC_IN_MIN;
+        long hour = min /  MIN_IN_HOUR;
+        min = min %  MIN_IN_HOUR;
+        long day = hour /  HOURS_IN_DAY;
+        hour = hour %  HOURS_IN_DAY;
+
+
+        String strMin = " Min" + ((min != 1) ? "s" : "");
+        String strSec = " Sec" + ((sec != 1) ? "s" : "");
+        String strHours = " Hour" + ((hour != 1) ? "s" : "");
+        String strDay = " Day" + ((day != 1) ? "s" : "");
+        return day + strDay + ", " + hour + strHours + ", "  +
+               min + strMin + ", " + sec + strSec;
     }
 
 }

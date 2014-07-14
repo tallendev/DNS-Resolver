@@ -100,6 +100,7 @@ public enum RecordType
         /** Short representation of SOA record. */
         final short SOA_SHORT   = (short) 6;
 
+        /** Fills the tTable with values. */
         tTable.put(A_STR, A);
         tTable.put(CNAME_STR, CNAME);
         tTable.put(MX_STR, MX);
@@ -107,6 +108,7 @@ public enum RecordType
         tTable.put(PTR_STR, PTR);
         tTable.put(SOA_STR, SOA);
 
+        /** Filles the reverse lookup table. */
         reverseTTable.put(A_SHORT, A);
         reverseTTable.put(CNAME_SHORT, CNAME);
         reverseTTable.put(MX_SHORT, MX);
@@ -114,11 +116,13 @@ public enum RecordType
         reverseTTable.put(PTR_SHORT, PTR);
         reverseTTable.put(SOA_SHORT, SOA);
 
+        /** The values for these class types.*/
         final byte IN = (byte) 0b00000001;
         final byte CS = (byte) 0b00000010;
         final byte CH = (byte) 0b00000011;
         final byte HS = (byte) 0b00000100;
 
+        /** Fills the class table.*/
         classTable.put(IN, IN_STR);
         classTable.put(CS, CS_STR);
         classTable.put(CH, CH_STR);
@@ -188,7 +192,6 @@ public enum RecordType
      */
     public static String classLookup(byte key)
     {
-        assert classTable.get(key) != null : "Key: " + key;
         return classTable.get(key);
     }
 
@@ -199,7 +202,6 @@ public enum RecordType
      */
     public static RecordType reverseTypeLookup(short key)
     {
-        assert reverseTTable.get(key) != null : "key: " + key;
         return reverseTTable.get(key);
     }
 
@@ -210,7 +212,6 @@ public enum RecordType
      */
     public static RecordType typeLookup(String key)
     {
-        assert tTable.get(key.toUpperCase()) != null : "key: " + key;
         return tTable.get(key.toUpperCase());
     }
 }

@@ -8,6 +8,9 @@ import java.util.List;
  */
 public abstract class Record
 {
+    /** The value assigned to the made up "Query" record type. */
+    public final static short QUERY_TTL = -1;
+
     /** The domain name of this record. */
     private String name;
     /** The type of this record. */
@@ -144,7 +147,7 @@ public abstract class Record
     @Override
     public String toString()
     {
-        return String.format("%-30s\t%6S\t%-2S\t%-20s\t", getName(), getType(),
+        return String.format("%-30s\t%6S\t%-2S\t%-40s", getName(), getType(),
                              getClassType(), Util.readableTime(getTtl()));
     }
 }

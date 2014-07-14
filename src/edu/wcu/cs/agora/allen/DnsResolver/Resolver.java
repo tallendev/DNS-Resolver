@@ -26,6 +26,8 @@ public class Resolver
     public final static int UDP_BUFF = 1024;
     /** The timeout waiting for TCP and UDP responses. */
     public final static int TIMEOUT  = 3000;
+    /** The value assigned to the made up "Query" record type. */
+    public final static int QUERY_TTL = Record.QUERY_TTL;
 
 
     /** This field holds the only instance of the resolver class.*/
@@ -326,12 +328,17 @@ public class Resolver
                 String name = formatDomainName(extractDomainField(offset));
                 RecordType type = extractRecordType();
                 short classType = extractClassType();
-                queries.add(Record.recordFactory(name, type, classType, -1,
-                                                 null));
+                queries.add(Record.recordFactory(name, type, classType,
+                                                 (short) QUERY_TTL, null));
             }
             return queries;
         }
 
+        /**
+         * Extracts and the next two bytes and performs a type lookup.
+         * They should be the RD length if this is being called.
+         * @return The RDlength for the current record.
+         */
         private RecordType extractRecordType()
         {
             RecordType type = RecordType.reverseTypeLookup(
@@ -341,6 +348,11 @@ public class Resolver
             return type;
         }
 
+        /**
+         * Extracts and returns the next two bytes. They should be the class
+         * type if this is being called.
+         * @return The class type for the current record.
+         */
         private short extractClassType()
         {
             short classType = Util.bytesToShort(buff.get(offset),
@@ -349,12 +361,22 @@ public class Resolver
             return classType;
         }
 
+        /**
+         * Converts the bytes in the list into a domain name.
+         * @param bytes The domain name in a list of bytes.
+         * @return The string form of the domain name.
+         */
         private String formatDomainName(List<Byte> bytes)
         {
             return new String(Util.unboxBytes(bytes),
                              StandardCharsets.UTF_8);
         }
 
+        /**
+         * Extracts and returns the next four bytes. They should be the TTL
+         * if this is being called.
+         * @return The TTL for the current record.
+         */
         private int extractTtl()
         {
             int ttl = Util.bytesToInt(buff.get(offset),
@@ -365,6 +387,11 @@ public class Resolver
             return ttl;
         }
 
+        /**
+         * Extracts and returns the next two bytes. They should be the RD
+         * length if this is being called.
+         * @return The RDlength for the current record.
+         */
         private short extractRdLength()
         {
             short rdLen = Util.bytesToShort(buff.get(offset),
@@ -417,45 +444,15 @@ public class Resolver
             }
         }
 
+        /**
+         * Abstracted method that currently uses the same solution as
+         * makeAnswers.
+         * @param atCount The number of authority records to search for.
+         * @return The List of authority records.
+         */
         private List<Record> makeAuthority(int atCount)
         {
-            List<Record> list = new LinkedList<>();
-            for (int i = 0; i < atCount; i++)
-            {
-                List<Byte> temp = extractDomainField(offset);
-                String name = formatDomainName(temp);
-                RecordType type = extractRecordType();
-                short classType = extractClassType();
-                int ttl = extractTtl();
-                short rdlength = extractRdLength();
-                List<Byte> rdata = buff.subList(offset, offset + rdlength);
-                List<Byte> tempRdata = null;
-                if (type.isRdataExpandable())
-                {
-                    tempRdata = extractDomainField(offset);
-                }
-                else
-                {
-                    tempRdata = rdata;
-                    offset += rdlength;
-                }
-                if (type == RecordType.SOA)
-                {
-                    tempRdata.add((byte) '\t');
-                    tempRdata.addAll(extractDomainField(offset));
-                    tempRdata.addAll(buff.subList(offset, offset + SOA_DATA));
-                }
-                rdata = tempRdata;
-                // We subtract off rdlength so that we don't accidently incur
-                //an increase in offset by calling the expandRdata method.
-                list.add(Record.recordFactory(name, type, classType, ttl,
-                                              rdata));
-            }
-            // Removes all null elements from this list. Null elements will be
-            // returned if record type is not supported.
-            while (list.remove(null));
-            return list;
-            //return this.makeAnswers(atCount);
+            return this.makeAnswers(atCount);
         }
 
         /**
@@ -463,36 +460,42 @@ public class Resolver
          * also generate a response, as currently the Answers section is the
          * only section we include.
          * @param anCount The number of answers to search for.
-         * @return The Response generated by this object.
+         * @return The list of answer records generated by this object.
          */
         private List<Record> makeAnswers(int anCount)
         {
             List<Record> list = new LinkedList<>();
             for (int i = 0; i < anCount; i++)
             {
+                boolean valid = true;
                 List<Byte> temp = extractDomainField(offset);
                 String name = formatDomainName(temp);
-                RecordType type = extractRecordType();
+                RecordType type = null;
+                type = extractRecordType();
+                if (type == null)
+                {
+                    System.err.println("Invalid record type detected. " +
+                                       "Skipping this record. \n");
+                    valid = false;
+                }
                 short classType = extractClassType();
                 int ttl = extractTtl();
                 short rdlength = extractRdLength();
                 List<Byte> rdata = new LinkedList<Byte>();
-                //ifSoa(type, rdata);
                 rdlength = ifMX(type, rdata, rdlength);
-                if (type.isRdataExpandable())
-                {
+                if (valid && type.isRdataExpandable())
                     rdata.addAll(extractDomainField(offset));
-                }
                 else
                 {
                     rdata.addAll(buff.subList(offset, offset + rdlength));
                     offset += rdlength;
                 }
-
+                this.ifSOA(type, rdata);
                 // We subtract off rdlength so that we don't accidently incur
                 //an increase in offset by calling the expandRdata method.
-                list.add(Record.recordFactory(name, type, classType, ttl,
-                                              rdata));
+                if (valid)
+                    list.add(Record.recordFactory(name, type, classType,
+                                                  ttl, rdata));
             }
             // Removes all null elements from this list. Null elements will be
             // returned if record type is not supported.
@@ -500,16 +503,14 @@ public class Resolver
             return list;
         }
 
-      /*  public void ifSoa(RecordType type, List<Byte> tempRdata)
-        {
-            if (type == RecordType.SOA)
-            {
-                tempRdata.add((byte) '\t');
-                tempRdata.addAll(extractDomainField(offset));
-                tempRdata.addAll(buff.subList(offset, offset + SOA_DATA));
-            }
-        }*/
-
+        /**
+         * Special case for mx record.
+         * @param type To check if it's the MX record type.
+         * @param rdata The rdata to add to, in the event that it is an MX r
+         *              record.
+         * @param rdlength The current length, to be modified and returned.
+         * @return The possibly modified RD length.
+         */
         public short ifMX(RecordType type, List<Byte> rdata, short rdlength)
         {
             if (type == RecordType.MX)
@@ -520,6 +521,22 @@ public class Resolver
                 rdlength -= TWO_BYTES;
             }
             return rdlength;
+        }
+
+        /**
+         * Special case for a Source of Authority Record.
+         * @param type Relevant only if SOA record.
+         * @param rdata The rdata to add special things to if we have a
+         *              SOA record.
+         */
+        public void ifSOA(RecordType type, List<Byte> rdata)
+        {
+            if (type == RecordType.SOA)
+            {
+                rdata.add((byte) '\t');
+                rdata.addAll(extractDomainField(offset));
+                rdata.addAll(buff.subList(offset, offset + SOA_DATA));
+            }
         }
 
 
@@ -538,21 +555,10 @@ public class Resolver
         protected List<Byte> extractDomainField(int tempOffset)
         {
             List<Byte> field = new LinkedList<>();
-            // If the first two bits of a domain name field byte are 11, then
-            // it ias a pointer. Handle by calling followPointer.
-            if((buff.get(tempOffset) & DNS_PTR) == DNS_PTR)
-            {
-                field = followPointer(tempOffset, field);
-            }
-            else
-            {
-                field = followLabel(tempOffset, field);
-            }
-            // If we recurse first, there will always be an extra period at the
-            // front. This is a simpler solution than coding all possible places
-            // that a period should show up.
-            if (field.get(0) == '.')
-                field.remove(0);
+            field = followLabel(tempOffset, field);
+            // Removes extra period from the end. Much simpler than trying
+            // to prevent it from getting placed at all.
+            field.remove(field.size() - 1);
             return field;
         }
 
@@ -575,13 +581,13 @@ public class Resolver
             {
                 this.offset += TWO_BYTES;
             }
-            field.add((byte) '.');
             return followLabel(ptr, field);
         }
 
         /**
          * This method attempts to follow a label (domain name) in the buffer
-         * and construct a domain name from it.
+         * and construct a domain name from it. It is possible that a ptr is
+         * encountered, and handled appropriately.
          * @param tempOff This is the temporary offset we are working from.
          * @param field This is the domain name we are building.
          * @return The list we are building containing the domain name.
@@ -589,46 +595,43 @@ public class Resolver
         private List<Byte> followLabel(int tempOff, List<Byte> field)
         {
             int newOff = tempOff;
-            int size;
+            int size = 0;
             boolean recurse = false;
             int i;
             do
             {
-                size = buff.get(newOff);
-                newOff += ONE_BYTE;
-                if (newOff == offset + 1)
-                    offset += 1;
-                // End if recurse is true. Pointers can only be at the end of a
-                // label.
-                for (i = newOff; i < newOff + size && !recurse; i++)
-                {
-                    // Check if this byte could be a pointer...
-                    if ((buff.get(i) & DNS_PTR) == DNS_PTR)
-                    {
-                        followPointer(i, field);
-                        recurse = true;
-                    }
-                    // Follow label as usual.
-                    else
-                    {
-                        field.add(buff.get(i));
-                    }
-                }
-                if (newOff == offset)
-                {
-                    offset += size;
-                }
-                newOff += size;
                 // Check if the "Size" byte is a pointer.
-                if ((size != 0 && (buff.get(newOff) & DNS_PTR) == DNS_PTR))
+                if ((buff.get(newOff) & DNS_PTR) == DNS_PTR)
                 {
                     followPointer(newOff, field);
                     recurse = true;
                 }
-                // Append '.' character if necessary.
-                if (!recurse && size != 0 && buff.get(newOff) != 0)
-                    field.add((byte) '.');
-            } while(size != 0 && !recurse);
+                else
+                {
+                    size = buff.get(newOff);
+                    newOff += ONE_BYTE;
+                    if (newOff == offset + 1)
+                        offset += 1;
+                    // End if recurse is true. Pointers can only be at the end of a
+                    // label.
+                    for (i = newOff; i < newOff + size && !recurse; i++)
+                        // Check if this byte could be a pointer...
+                        if ((buff.get(i) & DNS_PTR) == DNS_PTR)
+                        {
+                            followPointer(i, field);
+                            recurse = true;
+                        }
+                        // Follow label as usual.
+                        else
+                            field.add(buff.get(i));
+                    if (newOff == offset)
+                        offset += size;
+                    newOff += size;
+                    // Append '.' character if necessary.
+                    if (!recurse && size != 0)
+                        field.add((byte) '.');
+                }
+            } while(!recurse && size != 0);
             return field;
         }
     }

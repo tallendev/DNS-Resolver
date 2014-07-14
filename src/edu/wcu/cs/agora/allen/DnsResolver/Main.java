@@ -56,9 +56,10 @@ public class Main
      */
     public static void main(String[] args)
     {
-	    if (args.length != CORRECT_ARGS)
+        if (args.length != CORRECT_ARGS)
             usage(ERROR_INVALID_ARGS, "Invalid Number of Arguments: " +
-                                       args.length);
+                                      args.length);
+        // tests record type validity
         if (RecordType.typeLookup(args[LOOKUP_TYPE]) == null)
             usage(ERROR_INVALID_ARGS, "Unsupported Record Type");
         Request request = null;

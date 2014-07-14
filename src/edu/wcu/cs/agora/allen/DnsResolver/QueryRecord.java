@@ -34,7 +34,7 @@ public class QueryRecord extends Record
      */
     protected QueryRecord(String name, RecordType type, String classType)
     {
-        super(name, type, classType, -1, null);
+        super(name, type, classType, (short) -1, null);
     }
 
     @Override

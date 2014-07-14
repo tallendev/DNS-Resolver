@@ -27,8 +27,8 @@ public class SOARecord extends Record
      * @param ttl Associated with the ttl field in Record.
      * @param rdata Associated with the RDATA field in Record.
      */
-    protected SOARecord(String name, RecordType type, String classType, int ttl,
-                       List<Byte> rdata)
+    protected SOARecord(String name, RecordType type, String classType,
+                        int ttl, List<Byte> rdata)
     {
         super(name, type, classType, ttl, rdata);
     }

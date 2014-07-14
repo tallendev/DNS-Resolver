@@ -10,6 +10,9 @@ import java.util.List;
  */
 public class MXRecord extends Record
 {
+    /** Number of bytes representing "priority" before MX record. */
+    public static final int PRIORITY_SIZE = 2;
+
     /**
      * Constructor simply calls super.
      * @param name Associated with the name field in Record.
@@ -18,8 +21,8 @@ public class MXRecord extends Record
      * @param ttl Associated with the ttl field in Record.
      * @param rdata Associated with the RDATA field in Record.
      */
-    protected MXRecord(String name, RecordType type, String classType, int ttl,
-                       List<Byte> rdata)
+    protected MXRecord(String name, RecordType type, String classType,
+                       int ttl, List<Byte> rdata)
     {
         super(name, type, classType, ttl, rdata);
     }
@@ -44,6 +47,8 @@ public class MXRecord extends Record
     {
         List<Byte> rdata = super.getRdata();
         return Util.bytesToShort(rdata.get(0), rdata.get(1)) + "\t" +
-               new String(Util.unboxBytes(rdata), StandardCharsets.UTF_8);
+               new String(Util.unboxBytes(rdata.
+                               subList(PRIORITY_SIZE, rdata.size())),
+                               StandardCharsets.UTF_8);
     }
 }
